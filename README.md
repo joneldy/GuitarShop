@@ -1,3 +1,3 @@
 # GuitarShop
 
-Buy guitars online
+Buy guitar online
