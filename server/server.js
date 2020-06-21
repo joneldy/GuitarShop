@@ -1,6 +1,8 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
+const formidable = require('express-formidable');
+const cloudinary = require('cloudinary');
 
 const app = express();
 const mongoose = require('mongoose');
@@ -13,29 +15,25 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-//=================================
-//      Models
-//=================================
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.CLOUD_API_KEY,
+  api_secret: process.env.CLOUD_API_SECRET,
+});
 
+// Models
 const { User } = require('./models/user');
 const { Brand } = require('./models/brand');
 const { Wood } = require('./models/wood');
 const { Product } = require('./models/product');
 
-//=================================
-//    Middleware
-//=================================
-
+// Middlewares
 const { auth } = require('./middleware/auth');
 const { admin } = require('./middleware/admin');
 
 //=================================
-//    Routes
+//             PRODUCTS
 //=================================
-
-/*
-  Products
-*/
 
 app.post('/api/product/shop', (req, res) => {
   let order = req.body.order ? req.body.order : 'desc';
@@ -57,7 +55,6 @@ app.post('/api/product/shop', (req, res) => {
     }
   }
 
-  console.log('findArgs', findArgs);
   findArgs['publish'] = true;
 
   Product.find(findArgs)
@@ -79,8 +76,7 @@ app.post('/api/product/shop', (req, res) => {
 // /articles?sortBy=createdAt&order=desc&limit=4
 
 // BY SELL
-// /articles?sortBy=sold&order=desc&limit=100&skip=5
-
+// /articles?sortBy=sold&order=desc&limit=100
 app.get('/api/product/articles', (req, res) => {
   let order = req.query.order ? req.query.order : 'asc';
   let sortBy = req.query.sortBy ? req.query.sortBy : '_id';
@@ -97,18 +93,7 @@ app.get('/api/product/articles', (req, res) => {
     });
 });
 
-app.post('/api/product/article', auth, admin, (req, res) => {
-  const product = new Product(req.body);
-
-  product.save((err, doc) => {
-    if (err) return res.json({ success: false, err });
-    res.status(200).json({
-      success: true,
-      article: doc,
-    });
-  });
-});
-
+/// /api/product/article?id=HSHSHSKSK,JSJSJSJS,SDSDHHSHDS,JSJJSDJ&type=single
 app.get('/api/product/articles_by_id', (req, res) => {
   let type = req.query.type;
   let items = req.query.id;
@@ -129,9 +114,22 @@ app.get('/api/product/articles_by_id', (req, res) => {
     });
 });
 
-/*
-  WOODS
-*/
+app.post('/api/product/article', auth, admin, (req, res) => {
+  const product = new Product(req.body);
+
+  product.save((err, doc) => {
+    if (err) return res.json({ success: false, err });
+    res.status(200).json({
+      success: true,
+      article: doc,
+    });
+  });
+});
+
+//=================================
+//              WOODS
+//=================================
+
 app.post('/api/product/wood', auth, admin, (req, res) => {
   const wood = new Wood(req.body);
 
@@ -151,11 +149,13 @@ app.get('/api/product/woods', (req, res) => {
   });
 });
 
-/*
-  Brand
-*/
+//=================================
+//              BRAND
+//=================================
+
 app.post('/api/product/brand', auth, admin, (req, res) => {
   const brand = new Brand(req.body);
+
   brand.save((err, doc) => {
     if (err) return res.json({ success: false, err });
     res.status(200).json({
@@ -172,9 +172,9 @@ app.get('/api/product/brands', (req, res) => {
   });
 });
 
-/*
-  Users
-*/
+//=================================
+//              USERS
+//=================================
 
 app.get('/api/users/auth', auth, (req, res) => {
   res.status(200).json({
@@ -228,6 +228,32 @@ app.get('/api/users/logout', auth, (req, res) => {
     return res.status(200).send({
       success: true,
     });
+  });
+});
+
+app.post('/api/users/uploadimage', auth, admin, formidable(), (req, res) => {
+  cloudinary.uploader.upload(
+    req.files.file.path,
+    (result) => {
+      console.log(result);
+      res.status(200).send({
+        public_id: result.public_id,
+        url: result.url,
+      });
+    },
+    {
+      public_id: `${Date.now()}`,
+      resource_type: 'auto',
+    }
+  );
+});
+
+app.get('/api/users/removeimage', auth, admin, (req, res) => {
+  let image_id = req.query.public_id;
+
+  cloudinary.uploader.destroy(image_id, (error, result) => {
+    if (error) return res.json({ succes: false, error });
+    res.status(200).send('ok');
   });
 });
 
